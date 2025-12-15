@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anime Player</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- VLC.js / video.js para suporte a mais formatos -->
+    <link href="https://vjs.zencdn.net/8.6.1/video-js.css" rel="stylesheet" />
+    <script src="https://vjs.zencdn.net/8.6.1/video.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            min-height: 100vh;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        .sidebar {
+            width: 350px;
+            background: #16213e;
+            overflow-y: auto;
+            border-right: 1px solid #0f3460;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+        }
+
+        h1 {
+            padding: 20px;
+            background: #0f3460;
+            color: #e94560;
+            font-size: 1.5rem;
+        }
+
+        .search-box {
+            padding: 15px;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            background: #1a1a2e;
+            color: #fff;
+            font-size: 14px;
+        }
+
+        .anime-list {
+            list-style: none;
+        }
+
+        .anime-item {
+            padding: 15px 20px;
+            border-bottom: 1px solid #0f3460;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .anime-item:hover {
+            background: #0f3460;
+        }
+
+        .anime-item.active {
+            background: #e94560;
+        }
+
+        .anime-title {
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+
+        .episode-count {
+            font-size: 12px;
+            color: #888;
+        }
+
+        .releases-panel {
+            background: #16213e;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+
+        .release-item {
+            padding: 12px;
+            margin: 5px 0;
+            background: #1a1a2e;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background 0.2s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .release-item:hover {
+            background: #0f3460;
+        }
+
+        .release-item.playing {
+            background: #e94560;
+        }
+
+        .release-info {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .release-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .release-actions button {
+            background: #0f3460;
+            border: none;
+            color: #fff;
+            padding: 6px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background 0.2s;
+        }
+
+        .release-actions button:hover {
+            background: #e94560;
+        }
+
+        .player-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            max-height: 100%;
+        }
+
+        .loading {
+            color: #e94560;
+            font-size: 18px;
+        }
+
+        .no-video {
+            color: #666;
+            text-align: center;
+        }
+
+        .no-video p {
+            margin: 10px 0;
+        }
+
+        .resolution-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            background: #e94560;
+            border-radius: 3px;
+            font-size: 11px;
+        }
+
+        .video-options {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            padding: 30px;
+        }
+
+        .video-options h2 {
+            color: #e94560;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 24px;
+            background: #e94560;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: all 0.2s;
+            border: none;
+            cursor: pointer;
+        }
+
+        .btn:hover {
+            background: #d63850;
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: #0f3460;
+        }
+
+        .btn-secondary:hover {
+            background: #1a4a8a;
+        }
+
+        .copy-notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #4caf50;
+            color: white;
+            padding: 15px 25px;
+            border-radius: 8px;
+            display: none;
+            animation: slideIn 0.3s ease;
+            z-index: 1000;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        .error-msg {
+            color: #ff6b6b;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .video-info {
+            background: #16213e;
+            padding: 10px 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            font-size: 13px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .video-info .title {
+            color: #e94560;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <h1>🎬 Anime Player</h1>
+            
+            <!-- Stats Dashboard -->
+            <div id="statsPanel" style="padding: 15px; background: #0f3460; margin: 10px; border-radius: 8px;">
+                <div style="display: flex; justify-content: space-around; text-align: center;">
+                    <div>
+                        <div style="font-size: 24px; color: #4caf50;" id="statConverted">0</div>
+                        <div style="font-size: 11px; color: #888;">Convertidos</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 24px; color: #ff9800;" id="statPending">0</div>
+                        <div style="font-size: 11px; color: #888;">Pendentes</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 24px; color: #2196f3;" id="statTotal">0</div>
+                        <div style="font-size: 11px; color: #888;">Total</div>
+                    </div>
+                </div>
+                <div style="margin-top: 10px; background: #1a1a2e; border-radius: 4px; height: 8px; overflow: hidden;">
+                    <div id="progressBar" style="height: 100%; background: linear-gradient(90deg, #4caf50, #8bc34a); width: 0%; transition: width 0.5s;"></div>
+                </div>
+            </div>
+            
+            <!-- Tabs -->
+            <div style="display: flex; padding: 0 10px;">
+                <button onclick="showTab('animes')" id="tabAnimes" class="tab-btn active" style="flex: 1; padding: 10px; background: #e94560; border: none; color: white; cursor: pointer; border-radius: 5px 0 0 5px;">Animes</button>
+                <button onclick="showTab('recent')" id="tabRecent" class="tab-btn" style="flex: 1; padding: 10px; background: #0f3460; border: none; color: white; cursor: pointer; border-radius: 0 5px 5px 0;">Recentes ✨</button>
+            </div>
+            
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="Buscar anime...">
+            </div>
+            
+            <!-- Anime List -->
+            <ul class="anime-list" id="animeList"></ul>
+            
+            <!-- Recent Converted List (hidden by default) -->
+            <ul class="anime-list" id="recentList" style="display: none;"></ul>
+        </div>
+        <div class="main-content">
+            <div class="releases-panel" id="releasesPanel">
+                <p style="color: #666;">Selecione um anime para ver os episódios</p>
+            </div>
+            <div class="player-container" id="playerContainer">
+                <div class="no-video">
+                    <p style="font-size: 48px;">🎬</p>
+                    <p>Selecione um episódio para reproduzir</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="copy-notification" id="copyNotification">
+        <i class="fas fa-check"></i> Link copiado!
+    </div>
+
+    <script>
+        let animes = [];
+        let currentAnimeId = null;
+
+        async function loadAnimes() {
+            try {
+                const response = await fetch('/api/animes');
+                animes = await response.json();
+                renderAnimes(animes);
+            } catch (err) {
+                console.error('Error loading animes:', err);
+            }
+        }
+
+        function renderAnimes(list) {
+            const animeList = document.getElementById('animeList');
+            animeList.innerHTML = list.map(anime => `
+                <li class="anime-item" data-id="${anime.id}" onclick="selectAnime(${anime.id})">
+                    <div class="anime-title">${anime.title}</div>
+                    <div class="episode-count">${anime.episode_count} episódio(s)</div>
+                </li>
+            `).join('');
+        }
+
+        async function selectAnime(animeId) {
+            currentAnimeId = animeId;
+            
+            document.querySelectorAll('.anime-item').forEach(item => {
+                item.classList.toggle('active', item.dataset.id == animeId);
+            });
+
+            try {
+                const response = await fetch(`/api/animes/${animeId}/releases`);
+                const releases = await response.json();
+                renderReleases(releases);
+            } catch (err) {
+                console.error('Error loading releases:', err);
+            }
+        }
+
+        function renderReleases(releases) {
+            const panel = document.getElementById('releasesPanel');
+            if (releases.length === 0) {
+                panel.innerHTML = '<p style="color: #666;">Nenhum episódio disponível</p>';
+                return;
+            }
+
+            panel.innerHTML = releases.map(release => `
+                <div class="release-item" data-id="${release.id}">
+                    <div class="release-info" onclick="openGofile('${release.gofile_url}', ${release.is_converted}, this.parentElement, ${release.id})">
+                        ${release.is_converted ? '<i class="fas fa-check-circle" style="color: #4caf50;"></i>' : '<i class="fas fa-clock" style="color: #ff9800;"></i>'}
+                        ${release.original_filename}
+                        ${release.resolution ? `<span class="resolution-badge">${release.resolution}</span>` : ''}
+                    </div>
+                    <div class="release-actions">
+                        <button onclick="copyLink('${release.gofile_url}')" title="Copiar link">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                        <button onclick="openInNewTab('${release.gofile_url}')" title="Abrir em nova aba">
+                            <i class="fas fa-external-link-alt"></i>
+                        </button>
+                        <button onclick="openGofile('${release.gofile_url}', ${release.is_converted}, this.closest('.release-item'), ${release.id})" title="Reproduzir">
+                            <i class="fas fa-play"></i>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Variável global para release atual
+        let currentReleaseId = null;
+
+        async function openGofile(gofileUrl, isConverted, element, releaseId) {
+            document.querySelectorAll('.release-item').forEach(item => {
+                item.classList.remove('playing');
+            });
+            if (element) element.classList.add('playing');
+
+            const playerContainer = document.getElementById('playerContainer');
+            const contentId = gofileUrl.split('/d/')[1];
+            const streamUrl = `/api/stream/${contentId}`;
+            currentReleaseId = releaseId;
+            
+            if (isConverted) {
+                // Criar player com controles avançados
+                playerContainer.innerHTML = `
+                    <div style="width: 100%; height: 100%; display: flex; flex-direction: column;">
+                        <!-- Controles superiores -->
+                        <div id="playerControls" style="display: flex; gap: 10px; padding: 10px; background: #16213e; align-items: center;">
+                            <label style="font-size: 12px; color: #888;">
+                                <i class="fas fa-closed-captioning"></i> Legenda:
+                                <select id="subtitleSelect" onchange="changeSubtitle()" style="background: #1a1a2e; color: white; border: 1px solid #0f3460; padding: 5px; border-radius: 4px; margin-left: 5px;">
+                                    <option value="">Desativada</option>
+                                </select>
+                            </label>
+                            <label style="font-size: 12px; color: #888;">
+                                <i class="fas fa-volume-up"></i> Áudio:
+                                <select id="audioSelect" onchange="changeAudio()" style="background: #1a1a2e; color: white; border: 1px solid #0f3460; padding: 5px; border-radius: 4px; margin-left: 5px;">
+                                    <option value="0">Faixa 1</option>
+                                </select>
+                            </label>
+                            <span id="trackInfo" style="font-size: 11px; color: #666; margin-left: auto;"></span>
+                        </div>
+                        <!-- Player -->
+                        <video id="videoPlayer" controls autoplay style="flex: 1; width: 100%; background: #000;">
+                            <source src="${streamUrl}" type="video/mp4">
+                        </video>
+                    </div>
+                `;
+                
+                // Carregar legendas disponíveis
+                if (releaseId) {
+                    loadSubtitles(releaseId);
+                }
+                
+                // Detectar faixas de áudio do vídeo
+                const video = document.getElementById('videoPlayer');
+                video.addEventListener('loadedmetadata', () => {
+                    detectAudioTracks(video);
+                });
+                
+            } else {
+                // Vídeo não convertido, mostra aviso
+                playerContainer.innerHTML = `
+                    <div class="video-options">
+                        <h2><i class="fas fa-clock"></i> Vídeo não convertido</h2>
+                        <p style="color: #888;">Este vídeo ainda não foi convertido para MP4.</p>
+                        <p style="color: #666;">Execute o conversor para adicionar este vídeo.</p>
+                        <a href="${gofileUrl}" target="_blank" class="btn" style="margin-top: 15px;">
+                            <i class="fas fa-external-link-alt"></i> Abrir no GoFile
+                        </a>
+                    </div>
+                `;
+            }
+        }
+
+        async function loadSubtitles(releaseId) {
+            try {
+                const response = await fetch(`/api/subtitles/${releaseId}`);
+                const subs = await response.json();
+                
+                const select = document.getElementById('subtitleSelect');
+                if (!select) return;
+                
+                if (subs.length === 0) {
+                    select.innerHTML = '<option value="">Nenhuma disponível</option>';
+                    return;
+                }
+                
+                select.innerHTML = '<option value="">Desativada</option>' + 
+                    subs.map(sub => {
+                        const langName = getLanguageName(sub.language);
+                        return `<option value="${sub.gofile_url}" data-lang="${sub.language}">${langName} ${sub.source ? '(' + sub.source + ')' : ''}</option>`;
+                    }).join('');
+                    
+                document.getElementById('trackInfo').textContent = `${subs.length} legenda(s)`;
+            } catch (err) {
+                console.error('Erro ao carregar legendas:', err);
+            }
+        }
+
+        function getLanguageName(code) {
+            const langs = {
+                'por': 'Português', 'pt': 'Português', 'pt-br': 'Português (BR)',
+                'eng': 'English', 'en': 'English',
+                'jpn': 'Japonês', 'ja': 'Japonês', 'jp': 'Japonês',
+                'spa': 'Español', 'es': 'Español',
+                'und': 'Indefinido', 'chi': 'Chinês', 'zh': 'Chinês'
+            };
+            return langs[code?.toLowerCase()] || code || 'Legenda';
+        }
+
+        async function changeSubtitle() {
+            const select = document.getElementById('subtitleSelect');
+            const video = document.getElementById('videoPlayer');
+            const gofileUrl = select.value;
+            
+            // Remover tracks existentes
+            const existingTracks = video.querySelectorAll('track');
+            existingTracks.forEach(t => t.remove());
+            
+            if (!gofileUrl) return;
+            
+            // Extrair contentId do GoFile URL
+            const contentId = gofileUrl.split('/d/')[1];
+            const subtitleUrl = `/api/subtitle-stream/${contentId}`;
+            
+            // Adicionar nova track
+            const track = document.createElement('track');
+            track.kind = 'subtitles';
+            track.label = select.options[select.selectedIndex].text;
+            track.srclang = select.options[select.selectedIndex].dataset.lang || 'pt';
+            track.src = subtitleUrl;
+            track.default = true;
+            
+            video.appendChild(track);
+            
+            // Ativar legenda
+            setTimeout(() => {
+                if (video.textTracks.length > 0) {
+                    video.textTracks[0].mode = 'showing';
+                }
+            }, 500);
+        }
+
+        function detectAudioTracks(video) {
+            const select = document.getElementById('audioSelect');
+            if (!select || !video.audioTracks) return;
+            
+            const tracks = video.audioTracks;
+            if (tracks.length <= 1) {
+                select.innerHTML = '<option value="0">Áudio padrão</option>';
+                return;
+            }
+            
+            select.innerHTML = '';
+            for (let i = 0; i < tracks.length; i++) {
+                const track = tracks[i];
+                const label = track.label || track.language || `Faixa ${i + 1}`;
+                select.innerHTML += `<option value="${i}" ${track.enabled ? 'selected' : ''}>${label}</option>`;
+            }
+        }
+
+        function changeAudio() {
+            const video = document.getElementById('videoPlayer');
+            const select = document.getElementById('audioSelect');
+            const selectedIdx = parseInt(select.value);
+            
+            if (video.audioTracks) {
+                for (let i = 0; i < video.audioTracks.length; i++) {
+                    video.audioTracks[i].enabled = (i === selectedIdx);
+                }
+            }
+        }
+
+        function openInNewTab(url) {
+            window.open(url, '_blank');
+        }
+
+        function copyLink(url) {
+            navigator.clipboard.writeText(url).then(() => {
+                const notification = document.getElementById('copyNotification');
+                notification.style.display = 'block';
+                setTimeout(() => {
+                    notification.style.display = 'none';
+                }, 2000);
+            });
+        }
+
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase();
+            const filtered = animes.filter(anime => 
+                anime.title.toLowerCase().includes(query)
+            );
+            renderAnimes(filtered);
+        });
+
+        // Stats update em tempo real
+        async function updateStats() {
+            try {
+                const response = await fetch('/api/stats');
+                const stats = await response.json();
+                
+                document.getElementById('statConverted').textContent = stats.converted;
+                document.getElementById('statPending').textContent = stats.pending;
+                document.getElementById('statTotal').textContent = stats.total;
+                
+                const percent = stats.total > 0 ? (stats.converted / stats.total * 100) : 0;
+                document.getElementById('progressBar').style.width = percent + '%';
+                
+                // Atualizar lista de recentes
+                renderRecentConverted(stats.recent || []);
+            } catch (err) {
+                console.error('Error updating stats:', err);
+            }
+        }
+
+        function renderRecentConverted(recentList) {
+            const list = document.getElementById('recentList');
+            if (recentList.length === 0) {
+                list.innerHTML = '<li style="padding: 20px; color: #666; text-align: center;">Nenhum vídeo convertido ainda</li>';
+                return;
+            }
+            
+            list.innerHTML = recentList.map(item => {
+                const time = new Date(item.converted_at).toLocaleTimeString('pt-BR');
+                const shortName = item.original_filename.length > 40 
+                    ? item.original_filename.substring(0, 40) + '...' 
+                    : item.original_filename;
+                const subCount = parseInt(item.subtitle_count) || 0;
+                const subBadge = subCount > 0 ? `<span style="background: #2196f3; padding: 2px 6px; border-radius: 3px; font-size: 10px; margin-left: 5px;">📝 ${subCount}</span>` : '';
+                return `
+                    <li class="anime-item" onclick="playConvertedRecent(${item.id}, ${item.release_id})">
+                        <div class="anime-title">
+                            <i class="fas fa-check-circle" style="color: #4caf50; margin-right: 5px;"></i>
+                            ${item.anime_title} ${subBadge}
+                        </div>
+                        <div class="episode-count">${shortName} - ${time}</div>
+                    </li>
+                `;
+            }).join('');
+        }
+
+        function showTab(tab) {
+            const animesTab = document.getElementById('tabAnimes');
+            const recentTab = document.getElementById('tabRecent');
+            const animeList = document.getElementById('animeList');
+            const recentList = document.getElementById('recentList');
+            
+            if (tab === 'animes') {
+                animesTab.style.background = '#e94560';
+                recentTab.style.background = '#0f3460';
+                animeList.style.display = 'block';
+                recentList.style.display = 'none';
+            } else {
+                animesTab.style.background = '#0f3460';
+                recentTab.style.background = '#e94560';
+                animeList.style.display = 'none';
+                recentList.style.display = 'block';
+                updateStats(); // Refresh recent list
+            }
+        }
+
+        async function playConverted(id) {
+            // Buscar o vídeo convertido por ID
+            try {
+                const response = await fetch('/api/converted');
+                const converted = await response.json();
+                const video = converted.find(v => v.id === id);
+                
+                if (video && video.gofile_url) {
+                    openGofile(video.gofile_url, true, null, video.release_id);
+                } else {
+                    alert('Vídeo não encontrado!');
+                }
+            } catch (err) {
+                console.error('Error playing converted:', err);
+            }
+        }
+
+        async function playConvertedRecent(id, releaseId) {
+            // Buscar o vídeo convertido por ID (versão otimizada com releaseId direto)
+            try {
+                const response = await fetch('/api/converted');
+                const converted = await response.json();
+                const video = converted.find(v => v.id === id);
+                
+                if (video && video.gofile_url) {
+                    openGofile(video.gofile_url, true, null, releaseId);
+                } else {
+                    alert('Vídeo não encontrado!');
+                }
+            } catch (err) {
+                console.error('Error playing converted:', err);
+            }
+        }
+
+        // Inicialização
+        loadAnimes();
+        updateStats();
+        
+        // Atualizar stats a cada 5 segundos
+        setInterval(updateStats, 5000);
+    </script>
+</body>
+</html>
